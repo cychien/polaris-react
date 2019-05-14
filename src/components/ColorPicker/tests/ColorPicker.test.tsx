@@ -160,8 +160,8 @@ describe('<ColorPicker />', () => {
 
     describe('isServer', () => {
       jest.resetModules();
-      jest.mock('@shopify/react-utilities/target', () => ({
-        ...require.requireActual('@shopify/react-utilities/target'),
+      jest.mock('../../../utilities/target', () => ({
+        ...require.requireActual('../../../utilities/target'),
         isServer: () => {
           return true;
         },

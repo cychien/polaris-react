@@ -1,5 +1,5 @@
 import * as React from 'react';
-import {classNames} from '@shopify/react-utilities/styles';
+import {classNames} from '@shopify/css-utilities';
 import {noop} from '@shopify/javascript-utilities/other';
 import {Months, isSameDay} from '@shopify/javascript-utilities/dates';
 import {withAppProvider, WithAppProviderProps} from '../../../AppProvider';

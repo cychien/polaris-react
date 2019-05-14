@@ -1,7 +1,8 @@
 import * as React from 'react';
-import * as targets from '@shopify/react-utilities/target';
 import {mountWithAppProvider, trigger} from 'test-utilities';
 import {Image} from 'components';
+
+import * as targets from '../../../utilities/target';
 import Avatar from '../Avatar';
 
 const actualIsServer = targets.isServer;

@@ -1,7 +1,8 @@
 import * as React from 'react';
 import * as appBridge from '@shopify/app-bridge';
 import {noop} from '@shopify/javascript-utilities/other';
-import * as targets from '@shopify/react-utilities/target';
+
+import * as targets from '../../../../../utilities/target';
 import createAppProviderContext, {
   setClientInterfaceHook,
 } from '../createAppProviderContext';
