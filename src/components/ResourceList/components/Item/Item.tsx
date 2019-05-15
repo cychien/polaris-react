@@ -1,7 +1,6 @@
 import * as React from 'react';
 import {classNames} from '@shopify/react-utilities/styles';
 import {createUniqueIDFactory, noop} from '@shopify/javascript-utilities/other';
-import compose from '@shopify/react-compose';
 import {DisableableAction, WithContextTypes} from '../../../../types';
 import ActionList from '../../../ActionList';
 import Popover from '../../../Popover';
@@ -11,10 +10,10 @@ import {Props as ThumbnailProps} from '../../../Thumbnail';
 import ButtonGroup from '../../../ButtonGroup';
 import Checkbox from '../../../Checkbox';
 import Button, {buttonsFrom} from '../../../Button';
-import {withAppProvider, WithAppProviderProps} from '../../../AppProvider';
+import {WithAppProviderProps} from '../../../AppProvider';
+import {usePolaris} from '../../../../hooks';
 
 import {SELECT_ALL_ITEMS} from '../../types';
-import withContext from '../../../WithContext';
 import ResourceListContext, {ResourceListContextType} from '../../context';
 import styles from './Item.scss';
 
@@ -65,265 +64,250 @@ export type CombinedProps =
 
 const getUniqueCheckboxID = createUniqueIDFactory('ResourceListItemCheckbox');
 
-export class Item extends React.PureComponent<CombinedProps, State> {
-  state: State = {
-    actionsMenuVisible: false,
+export default React.memo(function Item({
+  children,
+  url,
+  media,
+  shortcutActions,
+  ariaControls,
+  ariaExpanded,
+  persistActions = false,
+  accessibilityLabel,
+  id,
+  onClick = noop,
+}: Props) {
+  const [actionsMenuVisible, setActionsMenuVisible] = React.useState(false);
+  const [{focused, focusedInner}, setFocusState] = React.useState({
     focused: false,
     focusedInner: false,
-  };
+  });
 
-  private node: HTMLElement | null = null;
-  private checkboxId = getUniqueCheckboxID();
+  const node = React.useRef<HTMLDivElement>(null);
+  const checkboxId = React.useRef(getUniqueCheckboxID());
+  const {intl} = usePolaris();
+  const {
+    selectable,
+    selectMode,
+    loading,
+    onSelectionChange,
+    selectedItems,
+  } = React.useContext(ResourceListContext);
 
-  render() {
-    const {
-      children,
-      url,
-      media,
-      shortcutActions,
-      ariaControls,
-      ariaExpanded,
-      persistActions = false,
-      polaris: {intl},
-      accessibilityLabel,
-      context: {selectable, selectMode, loading},
-    } = this.props;
+  const selected = isSelected();
 
-    const {actionsMenuVisible, focused, focusedInner} = this.state;
+  let ownedMarkup: React.ReactNode = null;
+  let handleMarkup: React.ReactNode = null;
 
-    const selected = this.isSelected();
+  const mediaMarkup = media ? (
+    <div className={styles.Media} testID="Media">
+      {media}
+    </div>
+  ) : null;
 
-    let ownedMarkup: React.ReactNode = null;
-    let handleMarkup: React.ReactNode = null;
+  const checkboxAccessibilityLabel =
+    accessibilityLabel || intl.translate('Polaris.Common.checkbox');
 
-    const mediaMarkup = media ? (
-      <div className={styles.Media} testID="Media">
-        {media}
-      </div>
-    ) : null;
+  if (selectable) {
+    const label = selected
+      ? intl.translate('Polaris.ResourceList.Item.deselectItem', {
+          accessibilityLabel: checkboxAccessibilityLabel,
+        })
+      : intl.translate('Polaris.ResourceList.Item.selectItem', {
+          accessibilityLabel: checkboxAccessibilityLabel,
+        });
 
-    const checkboxAccessibilityLabel =
-      accessibilityLabel || intl.translate('Polaris.Common.checkbox');
-
-    if (selectable) {
-      const label = selected
-        ? intl.translate('Polaris.ResourceList.Item.deselectItem', {
-            accessibilityLabel: checkboxAccessibilityLabel,
-          })
-        : intl.translate('Polaris.ResourceList.Item.selectItem', {
-            accessibilityLabel: checkboxAccessibilityLabel,
-          });
-
-      handleMarkup = (
-        <div
-          className={styles.Handle}
-          onClick={this.handleLargerSelectionArea}
-          testID="LargerSelectionArea"
-        >
-          <div onClick={stopPropagation} className={styles.CheckboxWrapper}>
-            <Checkbox
-              testID="Checkbox"
-              id={this.checkboxId}
-              label={label}
-              labelHidden
-              onChange={this.handleSelection}
-              checked={selected}
-              disabled={loading}
-            />
-          </div>
-        </div>
-      );
-    }
-
-    if (media || selectable) {
-      ownedMarkup = (
-        <div className={styles.Owned}>
-          {handleMarkup}
-          {mediaMarkup}
-        </div>
-      );
-    }
-
-    const className = classNames(
-      styles.Item,
-      focused && styles.focused,
-      selectable && styles.selectable,
-      selected && styles.selected,
-      selectMode && styles.selectMode,
-      persistActions && styles.persistActions,
-      focusedInner && styles.focusedInner,
-    );
-
-    let actionsMarkup: React.ReactNode | null = null;
-    let disclosureMarkup: React.ReactNode | null = null;
-
-    if (shortcutActions && !loading) {
-      if (persistActions) {
-        actionsMarkup = (
-          <div className={styles.Actions} onClick={stopPropagation}>
-            <ButtonGroup>
-              {buttonsFrom(shortcutActions, {
-                size: 'slim',
-                plain: true,
-              })}
-            </ButtonGroup>
-          </div>
-        );
-
-        disclosureMarkup = (
-          <div className={styles.Disclosure} onClick={stopPropagation}>
-            <Popover
-              activator={
-                <Button
-                  aria-label={intl.translate(
-                    'Polaris.ResourceList.Item.actionsDropdown',
-                  )}
-                  onClick={this.handleActionsClick}
-                  plain
-                  icon="horizontalDots"
-                />
-              }
-              onClose={this.handleCloseRequest}
-              active={actionsMenuVisible}
-            >
-              <ActionList items={shortcutActions} />
-            </Popover>
-          </div>
-        );
-      } else {
-        actionsMarkup = (
-          <div className={styles.Actions} onClick={stopPropagation}>
-            <ButtonGroup segmented testID="ShortcutActions">
-              {buttonsFrom(shortcutActions, {
-                size: 'slim',
-              })}
-            </ButtonGroup>
-          </div>
-        );
-      }
-    }
-
-    const content = children ? (
-      <div className={styles.Content}>{children}</div>
-    ) : null;
-
-    const containerMarkup = (
+    handleMarkup = (
       <div
-        testID="Item-Content"
-        className={styles.Container}
-        id={this.props.id}
+        className={styles.Handle}
+        onClick={handleLargerSelectionArea}
+        testID="LargerSelectionArea"
       >
-        {ownedMarkup}
-        {content}
-        {actionsMarkup}
-        {disclosureMarkup}
-      </div>
-    );
-
-    const tabIndex = loading ? -1 : 0;
-
-    const accessibleMarkup = url ? (
-      <UnstyledLink
-        aria-describedby={this.props.id}
-        aria-label={accessibilityLabel}
-        className={styles.Link}
-        url={url}
-        onFocus={this.handleAnchorFocus}
-        onBlur={this.handleFocusedBlur}
-        tabIndex={tabIndex}
-      />
-    ) : (
-      <button
-        className={styles.Button}
-        aria-label={accessibilityLabel}
-        aria-controls={ariaControls}
-        aria-expanded={ariaExpanded}
-        onClick={this.handleClick}
-        onFocus={this.handleAnchorFocus}
-        onBlur={this.handleFocusedBlur}
-        tabIndex={tabIndex}
-      />
-    );
-
-    return (
-      <div
-        ref={this.setNode}
-        className={className}
-        onClick={this.handleClick}
-        onFocus={this.handleFocus}
-        onBlur={this.handleBlur}
-        onMouseDown={this.handleMouseDown}
-        onKeyUp={this.handleKeypress}
-        testID="Item-Wrapper"
-        data-href={url}
-      >
-        {accessibleMarkup}
-        {containerMarkup}
+        <div onClick={stopPropagation} className={styles.CheckboxWrapper}>
+          <Checkbox
+            testID="Checkbox"
+            id={checkboxId.current}
+            label={label}
+            labelHidden
+            onChange={handleSelection}
+            checked={selected}
+            disabled={loading}
+          />
+        </div>
       </div>
     );
   }
 
-  private setNode = (node: HTMLElement | null) => {
-    this.node = node;
-  };
+  if (media || selectable) {
+    ownedMarkup = (
+      <div className={styles.Owned}>
+        {handleMarkup}
+        {mediaMarkup}
+      </div>
+    );
+  }
 
-  private handleAnchorFocus = () => {
-    this.setState({focused: true, focusedInner: false});
-  };
+  const className = classNames(
+    styles.Item,
+    focused && styles.focused,
+    selectable && styles.selectable,
+    selected && styles.selected,
+    selectMode && styles.selectMode,
+    persistActions && styles.persistActions,
+    focusedInner && styles.focusedInner,
+  );
 
-  private handleFocusedBlur = () => {
-    this.setState({focused: true, focusedInner: true});
-  };
+  let actionsMarkup: React.ReactNode | null = null;
+  let disclosureMarkup: React.ReactNode | null = null;
 
-  private handleFocus = () => {
-    this.setState({focused: true});
-  };
+  if (shortcutActions && !loading) {
+    if (persistActions) {
+      actionsMarkup = (
+        <div className={styles.Actions} onClick={stopPropagation}>
+          <ButtonGroup>
+            {buttonsFrom(shortcutActions, {
+              size: 'slim',
+              plain: true,
+            })}
+          </ButtonGroup>
+        </div>
+      );
 
-  private handleBlur = (event: React.FocusEvent<HTMLElement>) => {
-    const isInside = this.compareEventNode(event);
-    if (
-      this.node == null ||
-      !this.node.contains(event.relatedTarget as HTMLElement)
-    ) {
-      this.setState({focused: false});
-    } else if (isInside) {
-      this.setState({focusedInner: true});
+      disclosureMarkup = (
+        <div className={styles.Disclosure} onClick={stopPropagation}>
+          <Popover
+            activator={
+              <Button
+                aria-label={intl.translate(
+                  'Polaris.ResourceList.Item.actionsDropdown',
+                )}
+                onClick={handleActionsClick}
+                plain
+                icon="horizontalDots"
+              />
+            }
+            onClose={handleCloseRequest}
+            active={actionsMenuVisible}
+          >
+            <ActionList items={shortcutActions} />
+          </Popover>
+        </div>
+      );
+    } else {
+      actionsMarkup = (
+        <div className={styles.Actions} onClick={stopPropagation}>
+          <ButtonGroup segmented testID="ShortcutActions">
+            {buttonsFrom(shortcutActions, {
+              size: 'slim',
+            })}
+          </ButtonGroup>
+        </div>
+      );
     }
-  };
+  }
 
-  private handleMouseDown = () => {
-    this.setState({focusedInner: true});
-  };
+  const content = children ? (
+    <div className={styles.Content}>{children}</div>
+  ) : null;
 
-  private handleLargerSelectionArea = (event: React.MouseEvent<any>) => {
+  const containerMarkup = (
+    <div testID="Item-Content" className={styles.Container} id={id}>
+      {ownedMarkup}
+      {content}
+      {actionsMarkup}
+      {disclosureMarkup}
+    </div>
+  );
+
+  const tabIndex = loading ? -1 : 0;
+
+  const accessibleMarkup = url ? (
+    <UnstyledLink
+      aria-describedby={id}
+      aria-label={accessibilityLabel}
+      className={styles.Link}
+      url={url}
+      onFocus={handleAnchorFocus}
+      onBlur={handleFocusedBlur}
+      tabIndex={tabIndex}
+    />
+  ) : (
+    <button
+      className={styles.Button}
+      aria-label={accessibilityLabel}
+      aria-controls={ariaControls}
+      aria-expanded={ariaExpanded}
+      onClick={handleClick}
+      onFocus={handleAnchorFocus}
+      onBlur={handleFocusedBlur}
+      tabIndex={tabIndex}
+    />
+  );
+
+  return (
+    <div
+      ref={node}
+      className={className}
+      onClick={handleClick}
+      onFocus={handleFocus}
+      onBlur={handleBlur}
+      onMouseDown={handleMouseDown}
+      onKeyUp={handleKeypress}
+      testID="Item-Wrapper"
+      data-href={url}
+    >
+      {accessibleMarkup}
+      {containerMarkup}
+    </div>
+  );
+
+  function handleAnchorFocus() {
+    setFocusState({focused: true, focusedInner: false});
+  }
+
+  function handleFocusedBlur() {
+    setFocusState({focused: true, focusedInner: true});
+  }
+
+  function handleFocus() {
+    setFocusState(({focusedInner}) => ({focused: true, focusedInner}));
+  }
+
+  function handleBlur(event: React.FocusEvent<HTMLElement>) {
+    const isInside = compareEventNode(event);
+    if (
+      node.current == null ||
+      !node.current.contains(event.relatedTarget as HTMLElement)
+    ) {
+      setFocusState(({focusedInner}) => ({focused: false, focusedInner}));
+    } else if (isInside) {
+      setFocusState(({focused}) => ({focused, focusedInner: true}));
+    }
+  }
+
+  function handleMouseDown() {
+    setFocusState(({focused}) => ({focused, focusedInner: true}));
+  }
+
+  function handleLargerSelectionArea(event: React.MouseEvent<any>) {
     stopPropagation(event);
-    this.handleSelection(!this.isSelected());
-  };
+    handleSelection(!isSelected());
+  }
 
-  private handleSelection = (value: boolean) => {
-    const {
-      id,
-      context: {onSelectionChange},
-    } = this.props;
+  function handleSelection(value: boolean) {
     if (id == null || onSelectionChange == null) {
       return;
     }
-    this.setState({focused: true, focusedInner: true});
-    onSelectionChange(value, id);
-  };
 
-  private handleClick = (event: React.MouseEvent<any>) => {
-    const {
-      id,
-      onClick,
-      url,
-      context: {selectMode},
-    } = this.props;
+    setFocusState({focused: true, focusedInner: true});
+    onSelectionChange(value, id);
+  }
+
+  function handleClick(event: React.MouseEvent<any>) {
     const {ctrlKey, metaKey} = event.nativeEvent;
-    const anchor = this.node && this.node.querySelector('a');
+    const anchor = node.current && node.current.querySelector('a');
 
     if (selectMode) {
-      this.handleLargerSelectionArea(event);
+      handleLargerSelectionArea(event);
       return;
     }
 
@@ -331,7 +315,7 @@ export class Item extends React.PureComponent<CombinedProps, State> {
       return;
     }
 
-    if (onClick) {
+    if (onClick !== noop) {
       onClick(id);
     }
 
@@ -343,35 +327,25 @@ export class Item extends React.PureComponent<CombinedProps, State> {
     if (url && anchor) {
       anchor.click();
     }
-  };
+  }
 
-  private handleKeypress = (event: React.KeyboardEvent<HTMLElement>) => {
-    const {
-      onClick = noop,
-      context: {selectMode},
-    } = this.props;
+  function handleKeypress(event: React.KeyboardEvent<HTMLElement>) {
     const {key} = event;
 
     if (key === 'Enter' && !selectMode) {
       onClick();
     }
-  };
+  }
 
-  private handleActionsClick = () => {
-    this.setState(({actionsMenuVisible}) => ({
-      actionsMenuVisible: !actionsMenuVisible,
-    }));
-  };
+  function handleActionsClick() {
+    setActionsMenuVisible(!actionsMenuVisible);
+  }
 
-  private handleCloseRequest = () => {
-    this.setState({actionsMenuVisible: false});
-  };
+  function handleCloseRequest() {
+    setActionsMenuVisible(false);
+  }
 
-  private isSelected() {
-    const {
-      id,
-      context: {selectedItems},
-    } = this.props;
+  function isSelected() {
     return (
       selectedItems &&
       ((Array.isArray(selectedItems) && selectedItems.includes(id)) ||
@@ -379,20 +353,13 @@ export class Item extends React.PureComponent<CombinedProps, State> {
     );
   }
 
-  private compareEventNode(event: React.FocusEvent<HTMLElement>) {
-    return this.props.onClick
-      ? event.target === this.node
+  function compareEventNode(event: React.FocusEvent<HTMLElement>) {
+    return onClick !== noop
+      ? event.target === node.current
       : (event.target as HTMLElement).tagName.toLowerCase() === 'a';
   }
-}
+});
 
 function stopPropagation(event: React.MouseEvent<any>) {
   event.stopPropagation();
 }
-
-export default compose<Props>(
-  withContext<Props, WithAppProviderProps, ResourceListContextType>(
-    ResourceListContext.Consumer,
-  ),
-  withAppProvider<Props>(),
-)(Item);
