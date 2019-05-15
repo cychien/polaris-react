@@ -4,7 +4,6 @@ import {classNames} from '@shopify/react-utilities/styles';
 import {navigationBarCollapsed} from '../../../../utilities/breakpoints';
 
 import NavigationContext from '../../context';
-import {WithAppProviderProps} from '../../../AppProvider';
 import Badge from '../../../Badge';
 import Icon, {Props as IconProps} from '../../../Icon';
 import Indicator from '../../../Indicator';
